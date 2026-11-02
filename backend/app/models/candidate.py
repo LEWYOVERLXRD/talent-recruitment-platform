@@ -1,6 +1,6 @@
 """候选人模型"""
-from sqlalchemy import String, Integer, ForeignKey, Enum as SAEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, ForeignKey, Index, Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
 from app.models.base import BaseModel
@@ -15,6 +15,7 @@ class CandidateSource(str, enum.Enum):
 class Candidate(BaseModel):
     """候选人表（猎头侧人才库资产，不属于客户企业）"""
     __tablename__ = "candidates"
+    __table_args__ = (Index("ix_candidate_provider_owner", "provider_id", "owner_user_id"),)
 
     name: Mapped[str] = mapped_column(String(50), nullable=False, comment="姓名")
     gender: Mapped[str] = mapped_column(String(10), nullable=True, comment="性别")
@@ -31,7 +32,30 @@ class Candidate(BaseModel):
         SAEnum(CandidateSource), nullable=False, default=CandidateSource.manual,
         comment="候选人来源(manual/self_apply)"
     )
-    # created_by 语义 = 归属顾问（录入人）
+    # 历史建档人不随转派改变；归属与当前负责人单独保存。
     created_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id"), nullable=True, comment="归属顾问(录入人)ID"
+        ForeignKey("users.id"), nullable=True, comment="历史建档人ID"
     )
+    provider_id: Mapped[int | None] = mapped_column(
+        ForeignKey("service_providers.id"), nullable=True, comment="个人或机构归属主体"
+    )
+    owner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, comment="当前负责人ID"
+    )
+    candidate_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, unique=True, comment="自助求职者账号ID"
+    )
+    provider = relationship("ServiceProvider")
+    owner = relationship("User", foreign_keys=[owner_user_id])
+
+    @property
+    def provider_kind(self):
+        return self.provider.kind if self.provider else None
+
+    @property
+    def agency_id(self):
+        return self.provider.agency_id if self.provider else None
+
+    @property
+    def owner_username(self):
+        return self.owner.username if self.owner else None

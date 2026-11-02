@@ -1,0 +1,37 @@
+# 本仓库只跟踪代码：backend 与 frontend，其余一律忽略
+答辩PPT/
+论文/
+论文latex/
+论文目录/
+项目用例图/
+开题报告/
+*.rar
+*.docx
+*.doc
+*.tmp
+.DS_Store
+Thumbs.db
+
+# A-D release additions
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+node_modules/
+dist/
+*.db
+.local/
+private_uploads/
+
+# 19-table candidate release additions
+求职综合展示/
+综合项目实训总结报告/
+课程作业提交要求.pptx
+git演练_第6周/
+启动与关闭手册.md
+项目进度留痕.md
+backend/_backup_tidy_*/
+*.pdf
+*.pptx
+

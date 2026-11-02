@@ -120,7 +120,7 @@ function handleBack() {
 <style scoped>
 .agreement-container {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--app-canvas);
   padding: 32px 20px;
 }
 
@@ -138,13 +138,13 @@ function handleBack() {
 .doc-title {
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 .meta {
   margin: 0 0 20px;
   font-size: 13px;
-  color: #909399;
+  color: var(--app-muted);
 }
 
 .section {
@@ -154,13 +154,13 @@ function handleBack() {
 .section-title {
   margin: 0 0 8px;
   font-size: 15px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 .para {
   margin: 0 0 8px;
   font-size: 14px;
   line-height: 1.8;
-  color: #606266;
+  color: var(--app-muted);
 }
 </style>

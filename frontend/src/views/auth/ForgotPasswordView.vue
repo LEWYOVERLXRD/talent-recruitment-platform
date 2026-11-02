@@ -236,7 +236,7 @@ function backToAccount() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--app-canvas);
   padding: 24px 20px;
 }
 
@@ -249,7 +249,7 @@ function backToAccount() {
   text-align: center;
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 .steps {
@@ -277,12 +277,12 @@ function backToAccount() {
 .auth-footer {
   text-align: center;
   font-size: 14px;
-  color: #606266;
+  color: var(--app-muted);
   margin-top: 8px;
 }
 
 .auth-footer a {
-  color: #409eff;
+  color: var(--app-primary);
   text-decoration: none;
 }
 

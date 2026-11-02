@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 
 @router.post("/register", response_model=UserOut, summary="用户注册")
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    """注册新用户（管理员不开放注册；招聘方需填企业名称）"""
+    """注册新用户：招聘方可新建企业或注册为待入企员工，管理员不开放注册。"""
     existing = get_user_by_username(db, user_in.username)
     if existing:
         raise HTTPException(

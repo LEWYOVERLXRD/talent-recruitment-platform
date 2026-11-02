@@ -55,7 +55,13 @@
 
         <!-- 招聘方需要归属企业：首位注册者建企业并成为主管 -->
         <template v-if="form.role === 'recruiter'">
-          <el-form-item label="所属企业名称" prop="company_name">
+          <el-form-item label="账号归属方式">
+            <el-radio-group v-model="form.company_join_mode">
+              <el-radio value="create">创建新企业</el-radio>
+              <el-radio value="invited">注册为待入企员工</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item v-if="form.company_join_mode === 'create'" label="所属企业名称" prop="company_name">
             <el-input
               v-model="form.company_name"
               placeholder="如：××科技有限公司"
@@ -67,7 +73,7 @@
             type="info"
             :closable="false"
             show-icon
-            title="该企业尚未有成员时，你将成为企业主管（可管理本企业员工）；若企业已存在，你将以普通员工身份加入。"
+            :title="form.company_join_mode === 'create' ? '新建企业的注册者将成为企业主管；已存在的企业不能按名称自助加入。' : '注册后账号暂不归属企业，需由目标企业主管按用户名邀请，你接受后成为普通员工。邀请7天后过期。'"
           />
         </template>
 
@@ -165,6 +171,7 @@ const form = reactive({
 
   role: 'recruiter',
   company_name: '',
+  company_join_mode: 'create',
   // 固定 3 题，默认按顺序取三题
   security_answers: securityQuestions.map((q) => ({
     question_code: q.code,
@@ -183,6 +190,7 @@ function isQuestionUsed(code, currentIndex) {
 function handleRoleChange(value) {
   if (value !== 'recruiter') {
     form.company_name = ''
+    form.company_join_mode = 'create'
   }
 }
 
@@ -212,7 +220,10 @@ const rules = {
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
   role: [{ required: true, message: '请选择身份', trigger: 'change' }],
   company_name: [
-    { required: true, message: '请输入所属企业名称', trigger: 'blur' },
+    { validator: (_rule, value, callback) => {
+      if (form.role === 'recruiter' && form.company_join_mode === 'create' && !value?.trim()) callback(new Error('请输入所属企业名称'))
+      else callback()
+    }, trigger: 'blur' },
     { max: 100, message: '长度不超过 100 个字符', trigger: 'blur' },
   ],
 }
@@ -246,7 +257,8 @@ async function handleRegister() {
       email: form.email || null,
       phone: form.phone || null,
       role: form.role,
-      company_name: form.role === 'recruiter' ? form.company_name : null,
+      company_name: form.role === 'recruiter' && form.company_join_mode === 'create' ? form.company_name : null,
+      company_join_mode: form.role === 'recruiter' ? form.company_join_mode : 'create',
       security_answers: form.security_answers.map((item) => ({
         question_code: item.question_code,
         answer: item.answer,
@@ -269,7 +281,7 @@ async function handleRegister() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--app-canvas);
   padding: 24px 20px;
 }
 
@@ -282,7 +294,7 @@ async function handleRegister() {
   text-align: center;
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 .role-tip {
@@ -297,7 +309,7 @@ async function handleRegister() {
 }
 
 .agreement-link {
-  color: #409eff;
+  color: var(--app-primary);
   cursor: pointer;
 }
 
@@ -312,11 +324,11 @@ async function handleRegister() {
 .auth-footer {
   text-align: center;
   font-size: 14px;
-  color: #606266;
+  color: var(--app-muted);
 }
 
 .auth-footer a {
-  color: #409eff;
+  color: var(--app-primary);
   text-decoration: none;
 }
 

@@ -3,9 +3,10 @@
 “Job”在方案B里定位为“招聘需求 / 招聘任务单”：客户企业委托猎头寻访的具体岗位，
 而不仅是挂在招聘网站上的公开岗位。
 """
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer, ForeignKey, Enum as SAEnum
+from sqlalchemy import CheckConstraint, DateTime, Index, String, Text, Integer, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -28,6 +29,13 @@ class JobSource(str, enum.Enum):
 class Job(BaseModel):
     """招聘需求表"""
     __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint("version > 0", name="ck_job_version"),
+        CheckConstraint("(confirmed_by IS NULL AND confirmed_at IS NULL) OR "
+                        "(confirmed_by IS NOT NULL AND confirmed_at IS NOT NULL)",
+                        name="ck_job_confirmation_pair"),
+        Index("ix_job_client_status", "client_company_id", "status"),
+    )
 
     title: Mapped[str] = mapped_column(String(100), nullable=False, comment="需求/岗位名称")
     department: Mapped[str] = mapped_column(String(100), nullable=True, comment="部门")
@@ -61,6 +69,23 @@ class Job(BaseModel):
     # 建档人（表示由谁录入，不表示需求归属；归属用 client_company_id）
     created_by: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=True, comment="建档人ID"
+    )
+
+    # 岗位资料、客户确认与招聘条件版本
+    job_profile_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("job_profiles.id"), nullable=True, unique=True, comment="来源岗位资料ID"
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1", comment="招聘条件版本"
+    )
+    confirmed_by: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id"), nullable=True, comment="客户确认人ID"
+    )
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="当前版本确认时间"
+    )
+    ever_confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="首次确认时间"
     )
 
     # 客户企业对象（只读，供展示）

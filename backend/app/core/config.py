@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = ""
     LLM_MODEL: str = "gpt-3.5-turbo"
+    LLM_TIMEOUT_SECONDS: float = 60.0
+
+    # 私有简历目录，不挂载到静态资源
+    RESUME_STORAGE_DIR: Path = BASE_DIR / "private_uploads" / "resumes"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

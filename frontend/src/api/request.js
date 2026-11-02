@@ -25,12 +25,25 @@ service.interceptors.request.use(
 // 响应拦截器：处理 401、提取 detail 错误信息
 service.interceptors.response.use(
   (response) => response.data,
-  (error) => {
+  async (error) => {
     const status = error.response?.status
-    const detail =
-      error.response?.data?.detail ||
-      error.response?.data?.message ||
-      '请求失败，请稍后重试'
+    let detail = '请求失败，请稍后重试'
+
+    // 下载等 blob 请求失败时，后端错误体是 Blob，需读取后再取 detail
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text()
+        const parsed = JSON.parse(text)
+        detail = parsed?.detail || parsed?.message || detail
+      } catch {
+        // 非 JSON blob，保留默认提示
+      }
+    } else {
+      detail =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        detail
+    }
 
     // 401：token 失效或未登录，清除状态并跳登录页
     if (status === 401) {
@@ -46,9 +59,9 @@ service.interceptors.response.use(
     }
 
     // 统一抛出字符串错误信息，页面层直接 message.error(err) 即可
-    return Promise.reject(
-      typeof detail === 'string' ? detail : JSON.stringify(detail),
-    )
+    const message = typeof detail === 'string' ? detail : JSON.stringify(detail)
+    // C 批需要按状态处理失权/冲突；既有 A/B 调用继续收到字符串。
+    return Promise.reject(error.config?.businessStatus ? { status, message } : message)
   },
 )
 

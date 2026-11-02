@@ -2,13 +2,15 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.job import JobSource, JobStatus
 
 
 class JobCreate(BaseModel):
-    """创建招聘需求（双入口：企业方 / 猎头代建档）"""
+    """创建客户草稿；招聘方从账号企业取客户，猎头须选择已核验企业。"""
+
+    model_config = ConfigDict(extra="forbid")
 
     title: str = Field(..., min_length=1, max_length=100, description="需求/岗位名称")
     department: Optional[str] = None
@@ -17,11 +19,9 @@ class JobCreate(BaseModel):
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     location: Optional[str] = None
+    job_profile_content: Optional[str] = Field(None, min_length=1)
 
-    # 客户企业：企业方创建时由后端强制取本企业；猎头创建时通过名称动态获取/新建
-    client_company_name: Optional[str] = Field(
-        None, max_length=100, description="客户企业名称（猎头代客户建档时必填）"
-    )
+    client_company_id: Optional[int] = Field(None, gt=0, description="已有客户企业ID；企业招聘方不得指定")
     contact_person: Optional[str] = Field(None, max_length=50, description="客户联系人")
     contact_info: Optional[str] = Field(None, max_length=100, description="联系方式")
     hiring_count: Optional[int] = Field(None, description="招聘人数")
@@ -31,18 +31,55 @@ class JobCreate(BaseModel):
 class JobUpdate(BaseModel):
     """更新招聘需求（仅更新传入的字段）"""
 
-    title: Optional[str] = Field(None, max_length=100)
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int = Field(gt=0)
+    title: Optional[str] = Field(None, min_length=1, max_length=100)
     department: Optional[str] = None
     description: Optional[str] = None
     requirements: Optional[str] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     location: Optional[str] = None
-    status: Optional[JobStatus] = None
     contact_person: Optional[str] = None
     contact_info: Optional[str] = None
     hiring_count: Optional[int] = None
     priority: Optional[str] = None
+
+    @model_validator(mode="after")
+    def has_change(self):
+        if len(self.model_fields_set - {"expected_version"}) == 0:
+            raise ValueError("至少提供一个更新字段")
+        if "title" in self.model_fields_set and not (self.title or "").strip():
+            raise ValueError("岗位名称不能为空")
+        return self
+
+
+class JobConfirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(gt=0)
+
+
+class JobStatusChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(gt=0)
+    status: JobStatus
+    reason: Optional[str] = Field(None, max_length=1000)
+
+
+class ClientCompanyOption(BaseModel):
+    id: int
+    name: str
+
+
+class JobProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    raw_content: str
+    source_type: str
+    version: int
+    submitted_by: Optional[int] = None
+    submitted_at: datetime
 
 
 class JobOut(BaseModel):
@@ -65,6 +102,13 @@ class JobOut(BaseModel):
     hiring_count: Optional[int] = None
     priority: Optional[str] = None
     created_by: Optional[int] = None
+    job_profile_id: Optional[int] = None
+    version: int = 1
+    confirmed_by: Optional[int] = None
+    confirmed_at: Optional[datetime] = None
+    ever_confirmed_at: Optional[datetime] = None
+    has_current_authorization: bool = False
+    receivers: list[dict] = []
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

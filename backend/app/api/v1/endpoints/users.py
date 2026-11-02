@@ -1,13 +1,34 @@
 """用户接口：当前用户信息、账号状态管理"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
-from app.crud.user import get_user_by_id, update_enabled
+from app.api.deps import get_current_user, get_db, require_role
+from app.crud.user import get_user_by_id, list_users, update_enabled
 from app.models.user import CompanyRole, User, UserRole
-from app.schemas.user import UserOut, UserStatusIn
+from app.schemas.user import UserAdminPage, UserOut, UserStatusIn
 
 router = APIRouter(prefix="/users", tags=["用户"])
+
+
+@router.get("", response_model=UserAdminPage, summary="平台管理员分页查询用户")
+def get_users(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    keyword: str | None = Query(None, max_length=100),
+    role: UserRole | None = None,
+    enabled: bool | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin)),
+):
+    items, total = list_users(
+        db,
+        page=page,
+        size=size,
+        keyword=keyword,
+        role=role,
+        enabled=enabled,
+    )
+    return {"items": items, "total": total}
 
 
 @router.get("/me", response_model=UserOut, summary="获取当前登录用户信息")

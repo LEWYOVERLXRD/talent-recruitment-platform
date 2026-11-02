@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models.user import User, UserRole
@@ -20,6 +20,37 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     return db.query(User).filter(User.id == user_id).first()
 
 
+def list_users(
+    db: Session,
+    *,
+    page: int,
+    size: int,
+    keyword: Optional[str] = None,
+    role: Optional[UserRole] = None,
+    enabled: Optional[bool] = None,
+) -> tuple[list[User], int]:
+    """管理员分页查询用户，不返回凭据或密保数据。"""
+    query = db.query(User).options(joinedload(User.company))
+    if keyword:
+        pattern = f"%{keyword.strip()}%"
+        query = query.filter(
+            (User.username.ilike(pattern)) | (User.real_name.ilike(pattern))
+        )
+    if role is not None:
+        query = query.filter(User.role == role)
+    if enabled is not None:
+        query = query.filter(User.enabled == enabled)
+
+    total = query.count()
+    items = (
+        query.order_by(User.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    return items, total
+
+
 def create_user(
     db: Session,
     *,
@@ -31,6 +62,7 @@ def create_user(
     role: UserRole = UserRole.jobseeker,
     company_id: Optional[int] = None,
     company_role=None,
+    commit: bool = True,
 ) -> User:
     """创建用户（密码自动哈希）。
 
@@ -47,7 +79,10 @@ def create_user(
         company_role=company_role,
     )
     db.add(db_user)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(db_user)
     return db_user
 
@@ -86,7 +121,7 @@ def update_enabled(db: Session, user: User, enabled: bool) -> User:
 # ---------- 密保答案 ----------
 
 def create_security_answers(
-    db: Session, user_id: int, answers: list[tuple[str, str]]
+    db: Session, user_id: int, answers: list[tuple[str, str]], *, commit: bool = True
 ) -> None:
     """批量写入密保答案。answers 为 (question_code, 明文答案) 列表。
 
@@ -101,7 +136,10 @@ def create_security_answers(
                 answer_hash=hash_password(normalize_answer(answer)),
             )
         )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
 
 def get_security_answers(db: Session, user_id: int) -> list[UserSecurityAnswer]:

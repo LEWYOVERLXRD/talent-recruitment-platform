@@ -135,7 +135,7 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--app-canvas);
   padding: 20px;
 }
 
@@ -148,7 +148,7 @@ async function handleLogin() {
   text-align: center;
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 .forgot-row {
@@ -159,7 +159,7 @@ async function handleLogin() {
 
 .forgot-link {
   font-size: 13px;
-  color: #409eff;
+  color: var(--app-primary);
   text-decoration: none;
 }
 
@@ -168,7 +168,7 @@ async function handleLogin() {
 }
 
 .agreement-link {
-  color: #409eff;
+  color: var(--app-primary);
   cursor: pointer;
 }
 
@@ -183,11 +183,11 @@ async function handleLogin() {
 .auth-footer {
   text-align: center;
   font-size: 14px;
-  color: #606266;
+  color: var(--app-muted);
 }
 
 .auth-footer a {
-  color: #409eff;
+  color: var(--app-primary);
   text-decoration: none;
 }
 

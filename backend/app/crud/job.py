@@ -2,8 +2,10 @@
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.models.job import Job, JobSource, JobStatus
+from app.models.job_profile import JobProfile
 
 
 def get_job_by_id(db: Session, job_id: int) -> Optional[Job]:
@@ -28,8 +30,18 @@ def create_job(
     contact_info: Optional[str] = None,
     hiring_count: Optional[int] = None,
     priority: Optional[str] = None,
+    profile_content: Optional[str] = None,
+    profile_source: str = "manual",
 ) -> Job:
     """创建招聘需求"""
+    profile = JobProfile(
+        raw_content=profile_content or "\n".join(filter(None, [title, department, description, requirements])),
+        source_type=profile_source,
+        submitted_by=created_by,
+        submitted_at=datetime.now(),
+    )
+    db.add(profile)
+    db.flush()
     job = Job(
         title=title,
         department=department,
@@ -45,10 +57,10 @@ def create_job(
         hiring_count=hiring_count,
         priority=priority,
         created_by=created_by,
+        job_profile_id=profile.id,
     )
     db.add(job)
-    db.commit()
-    db.refresh(job)
+    db.flush()
     return job
 
 
@@ -56,8 +68,7 @@ def update_job(db: Session, job: Job, data: dict) -> Job:
     """按字段字典更新招聘需求（仅更新传入字段）"""
     for key, value in data.items():
         setattr(job, key, value)
-    db.commit()
-    db.refresh(job)
+    db.flush()
     return job
 
 

@@ -25,25 +25,34 @@ const MENUS_BY_ROLE = {
   admin: [
     { key: 'dashboard', label: '工作台' },
     { key: 'jobs', label: '招聘需求', done: true },
-    { key: 'companies', label: '企业管理', done: false },
-    { key: 'users', label: '用户管理', done: false },
+    { key: 'agencies', label: '机构管理', done: true },
+    { key: 'candidates', label: '候选人管理', done: true },
+    { key: 'recommendations', label: '推荐核验', done: true },
+    { key: 'companies', label: '企业核验', done: true },
+    { key: 'users', label: '用户管理', done: true },
   ],
   recruiter: [
     { key: 'dashboard', label: '工作台' },
     { key: 'jobs', label: '招聘需求', done: true },
+    { key: 'assignments', label: '需求承接', done: true },
+    { key: 'recommendations', label: '推荐反馈', done: true },
+    { key: 'company', label: '企业成员', done: true },
     { key: 'resumes', label: '简历管理', done: false },
-    { key: 'applications', label: '求职投递', done: false },
   ],
   headhunter: [
     { key: 'dashboard', label: '工作台' },
     { key: 'jobs', label: '招聘需求', done: true },
-    { key: 'candidates', label: '候选人管理', done: false },
+    { key: 'assignments', label: '我的任务', done: true },
+    { key: 'agency', label: '我的机构', done: true },
+    { key: 'candidates', label: '候选人管理', done: true },
+    { key: 'applications', label: '候选人投递', done: true },
+    { key: 'recommendations', label: '推荐交付', done: true },
   ],
   jobseeker: [
     { key: 'dashboard', label: '工作台' },
-    { key: 'jobs', label: '岗位浏览', done: false },
-    { key: 'resume', label: '我的简历', done: false },
-    { key: 'applications', label: '我的投递', done: false },
+    { key: 'jobs', label: '岗位浏览', done: true },
+    { key: 'resume', label: '我的简历', done: true },
+    { key: 'applications', label: '我的投递', done: true },
   ],
 }
 
@@ -77,6 +86,20 @@ export const useUserStore = defineStore('user', () => {
   const isManager = computed(
     () => role.value === 'recruiter' && user.value?.company_role === 'manager',
   )
+
+  // 是否客户企业主管（B 批：确认需求、暂停/恢复/关闭、定向邀请、撤权、确认完成）
+  const isClientManager = computed(
+    () => role.value === 'recruiter' && user.value?.company_role === 'manager',
+  )
+
+  // 是否企业普通员工
+  const isRecruiterStaff = computed(
+    () => role.value === 'recruiter' && user.value?.company_role === 'staff',
+  )
+
+  // 是否猎头（含机构主管/顾问/独立猎头）
+  const isHeadhunter = computed(() => role.value === 'headhunter')
+  const isJobseeker = computed(() => role.value === 'jobseeker')
 
   // 当前角色可见的菜单
   const menus = computed(() => MENUS_BY_ROLE[role.value] || [])
@@ -139,6 +162,10 @@ export const useUserStore = defineStore('user', () => {
     companyRoleLabel,
     isAdmin,
     isManager,
+    isClientManager,
+    isRecruiterStaff,
+    isHeadhunter,
+    isJobseeker,
     menus,
     setToken,
     login,

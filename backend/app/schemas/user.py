@@ -1,5 +1,5 @@
 """用户相关 Pydantic 数据模型：用于请求参数校验和响应序列化"""
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -27,8 +27,11 @@ class UserCreate(BaseModel):
     email: Optional[str] = Field(None, max_length=100, description="邮箱")
     phone: Optional[str] = Field(None, max_length=20, description="手机号")
     role: UserRole = Field(default=UserRole.jobseeker, description="平台角色")
+    company_join_mode: Literal["create", "invited"] = Field(
+        default="create", description="招聘方企业归属方式：新建企业或注册为待入企员工"
+    )
     company_name: Optional[str] = Field(
-        None, max_length=100, description="所属企业（role=recruiter 时必填）"
+        None, max_length=100, description="创建新企业时必填；待入企员工不按名称绑定企业"
     )
     security_answers: list[SecurityAnswerIn] = Field(
         ..., description=f"密保问答，必须 {SECURITY_QUESTION_COUNT} 条且题目不重复"
@@ -50,8 +53,11 @@ class UserCreate(BaseModel):
             raise ValueError(f"密保问答必须填写 {SECURITY_QUESTION_COUNT} 条")
         if len(set(codes)) != len(codes):
             raise ValueError("密保问答的题目不能重复")
-        if self.role == UserRole.recruiter and not self.company_name:
+        if (self.role == UserRole.recruiter and self.company_join_mode == "create"
+                and not self.company_name):
             raise ValueError("企业招聘方必须填写所属企业名称")
+        if self.company_join_mode == "invited" and self.company_name:
+            raise ValueError("待入企员工无需填写企业名称，请通过主管邀请加入")
         return self
 
 
@@ -82,6 +88,25 @@ class PasswordResetIn(BaseModel):
 class UserStatusIn(BaseModel):
     """启用/禁用账号"""
     enabled: bool = Field(..., description="true=启用，false=禁用")
+
+
+class UserAdminListItem(BaseModel):
+    """平台管理员用户列表字段，不包含联系方式、密码或密保数据。"""
+    id: int
+    username: str
+    real_name: Optional[str] = None
+    role: UserRole
+    company_id: Optional[int] = None
+    company_name: Optional[str] = None
+    company_role: Optional[CompanyRole] = None
+    enabled: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserAdminPage(BaseModel):
+    total: int
+    items: list[UserAdminListItem]
 
 
 # ---------- 响应模型 ----------

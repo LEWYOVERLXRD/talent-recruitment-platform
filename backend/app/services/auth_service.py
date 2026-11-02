@@ -10,6 +10,7 @@ from app.crud import company as company_crud
 from app.crud import user as user_crud
 from app.models.user import User, UserRole, CompanyRole
 from app.schemas.user import PasswordResetIn, UserCreate
+from app.services.agency_service import mutation
 from app.utils.security import (
     create_access_token,
     normalize_answer,
@@ -32,25 +33,38 @@ def generate_token(user: User) -> str:
     return create_access_token(subject=str(user.id))
 
 
+@mutation
 def register_user(db: Session, user_in: UserCreate) -> User:
     """注册用户。
 
     企业归属规则（仅 role=recruiter）：
     - 企业名称不存在 → 创建企业，注册者成为该企业 manager（第一个注册的人当家）
-    - 企业名称已存在 → 以 staff 身份加入该企业
+    - 企业名称已存在 → 拒绝自助加入，需先核验企业成员身份
+    - company_join_mode=invited → 仅创建无企业归属的招聘员工账号，等待主管邀请
     其余角色不涉及企业。
     """
     company_id = None
     company_role = None
 
-    if user_in.role == UserRole.recruiter:
-        company = company_crud.get_company_by_name(db, user_in.company_name)
+    if user_in.role == UserRole.recruiter and getattr(user_in, "company_join_mode", "create") == "create":
+        company_name = (user_in.company_name or "").strip()
+        if not company_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="企业名称不能为空",
+            )
+        company = company_crud.get_company_by_name(db, company_name)
         if company is None:
-            company = company_crud.create_company(db, user_in.company_name)
+            company = company_crud.create_company(db, company_name, commit=False)
             company_role = CompanyRole.manager
         else:
-            company_role = CompanyRole.staff
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="该企业已建档，请选择注册为待入企员工，再由企业主管按用户名邀请加入",
+            )
         company_id = company.id
+    elif user_in.role != UserRole.recruiter and getattr(user_in, "company_join_mode", "create") != "create":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅企业招聘方可注册为待入企员工")
 
     user = user_crud.create_user(
         db,
@@ -62,6 +76,7 @@ def register_user(db: Session, user_in: UserCreate) -> User:
         role=user_in.role,
         company_id=company_id,
         company_role=company_role,
+        commit=False,
     )
 
     # 密保答案：注册时固定写入 3 条（只存哈希）
@@ -69,6 +84,7 @@ def register_user(db: Session, user_in: UserCreate) -> User:
         db,
         user.id,
         [(a.question_code.value, a.answer) for a in user_in.security_answers],
+        commit=False,
     )
     return user
 

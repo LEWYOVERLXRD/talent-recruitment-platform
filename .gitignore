@@ -22,6 +22,8 @@ node_modules/
 dist/
 *.db
 .local/
+.venv/
+.uv-cache/
 private_uploads/
 
 # 19-table candidate release additions

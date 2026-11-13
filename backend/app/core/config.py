@@ -2,6 +2,7 @@
 from pathlib import Path
 from urllib.parse import quote_plus
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 项目根目录：backend/
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False  # 是否打印 SQL 日志
 
     # 安全
-    SECRET_KEY: str = "change-me-in-production"
+    SECRET_KEY: str = Field(repr=False)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     ALGORITHM: str = "HS256"
 
@@ -46,6 +47,9 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = ""
     LLM_MODEL: str = "gpt-3.5-turbo"
     LLM_TIMEOUT_SECONDS: float = 60.0
+    # 备用模型：主模型不可用时自动降级；留空则只使用主模型
+    LLM_FALLBACK_MODEL: str = ""
+    LLM_FALLBACK_BASE_URL: str = ""  # 留空则复用 LLM_BASE_URL
 
     # 私有简历目录，不挂载到静态资源
     RESUME_STORAGE_DIR: Path = BASE_DIR / "private_uploads" / "resumes"
@@ -54,7 +58,16 @@ class Settings(BaseSettings):
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        hide_input_in_errors=True,
     )
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_signing_key(cls, value: str) -> str:
+        if (len(value) < 32 or value != value.strip() or
+                value.lower().startswith(("your_", "change-me", "replace-me"))):
+            raise ValueError("SECRET_KEY 必须为至少 32 字符的独立随机密钥，不能使用默认值或占位符")
+        return value
 
     def get_database_url(self) -> str:
         """构造 MySQL 连接字符串。

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --experimental-vm-modules --test tests/ai-requests.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

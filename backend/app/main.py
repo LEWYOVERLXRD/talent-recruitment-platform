@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import SessionLocal, init_db
+from app.core.database import SessionLocal, verify_db_ready
 from app.crud.user import ensure_admin_user
 
 # Swagger UI 静态资源改为本地提供，避免运行时依赖 cdn.jsdelivr.net（国内访问不稳定会导致 /docs 白屏）
@@ -63,8 +63,8 @@ async def local_swagger_ui_oauth2_redirect():
 
 @app.on_event("startup")
 async def startup() -> None:
-    """应用启动时执行：建表 + 初始化管理员账号"""
-    init_db()
+    """应用启动时执行：只读检查数据库迁移版本 + 初始化管理员账号"""
+    verify_db_ready()
     seed_admin()
 
 

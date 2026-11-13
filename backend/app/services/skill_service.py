@@ -7,7 +7,6 @@ import unicodedata
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import settings
 from app.models import ParseStatus, ResumeSkill, Skill, User
 from app.services import llm
 from app.services.agency_service import mutation
@@ -152,7 +151,8 @@ def extract_skills(db, user, resume_id, expected):
     db.rollback()
     failure, items = None, None
     try:
-        items = parse_extraction(llm.chat(SYSTEM_PROMPT, content), content)
+        result = llm.chat_with_model(SYSTEM_PROMPT, content)
+        items = parse_extraction(result.content, content)
     except HTTPException as error:
         failure = error
     try:
@@ -173,7 +173,7 @@ def extract_skills(db, user, resume_id, expected):
                     continue
                 skill = get_or_create_skill(db, item["name"], item["category"])
                 db.add(ResumeSkill(resume_id=row.id, skill_id=skill.id, evidence=item["evidence"],
-                                   model_used=settings.LLM_MODEL, extracted_at=now, review_status="unreviewed"))
+                                   model_used=result.model_used, extracted_at=now, review_status="unreviewed"))
             row.extraction_status, row.extraction_error = "success", None
             row.extracted_at = now
             row.skill_revision += 1

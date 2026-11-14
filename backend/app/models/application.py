@@ -2,7 +2,7 @@
 from datetime import datetime
 import enum
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, Index, CheckConstraint, Enum as SAEnum
+from sqlalchemy import Computed, DateTime, ForeignKey, String, Text, UniqueConstraint, Index, CheckConstraint, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -39,10 +39,16 @@ class Application(BaseModel):
     __tablename__ = "applications"
     __table_args__ = (
         UniqueConstraint("job_id", "candidate_id", "publisher_user_id", name="uq_application_job_candidate_publisher"),
+        UniqueConstraint("primary_slot", name="uq_application_primary_slot"),
+        CheckConstraint("record_kind IN ('primary', 'duplicate')", name="ck_application_record_kind"),
         CheckConstraint(
             "review_status IN ('pending','not_recommended','recommendation_draft','recommended','legacy_unrouted')",
             name="ck_application_review_status",
         ),
+        CheckConstraint("source IN ('self_apply', 'hunter_referral')", name="ck_application_source"),
+        CheckConstraint("status IN ('submitted', 'screening', 'interview', 'offer', 'rejected', 'withdrawn')", name="ck_application_status"),
+        Index("ix_application_applicant_status", "applicant_user_id", "status", "id"),
+        Index("ix_application_job_status", "job_id", "status", "id"),
         Index("ix_application_publisher_review", "publisher_user_id", "review_status", "id"),
         Index("ix_application_canonical", "canonical_application_id", "id"),
     )
@@ -72,6 +78,14 @@ class Application(BaseModel):
     )
     canonical_application_id: Mapped[int | None] = mapped_column(
         ForeignKey("applications.id"), nullable=True, comment="对应的岗位候选人主投递"
+    )
+    primary_slot: Mapped[str | None] = mapped_column(
+        String(80),
+        Computed(
+            "CASE WHEN record_kind = 'primary' THEN CONCAT(job_id, ':', candidate_id) ELSE NULL END",
+            persisted=True,
+        ),
+        nullable=True,
     )
     review_status: Mapped[ApplicationReviewStatus] = mapped_column(
         SAEnum(ApplicationReviewStatus), nullable=False, default=ApplicationReviewStatus.pending,

@@ -1,31 +1,35 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.6.4
-pydantic-settings==2.2.1
-SQLAlchemy==2.0.23
-python-dotenv==1.0.0
-python-multipart==0.0.6
+# Python 3.11 / Windows x64；完整环境使用 requirements-py311.lock.txt。
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+SQLAlchemy==2.0.54
+alembic==1.20.1  # P0-2 数据库迁移；基线与升级脚本位于 backend/alembic
+python-dotenv==1.2.3
+python-multipart==0.0.32
 
 # MySQL 驱动（pymysql 纯 Python 实现，免编译，安装最稳）
-PyMySQL==1.1.0
-cryptography==41.0.7  # pymysql 用于 caching_sha2_password 认证
+PyMySQL==1.2.0
+cryptography==50.0.1  # pymysql 用于 caching_sha2_password 认证
 
 # 安全与鉴权
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2  # passlib 1.7.4 不兼容 bcrypt 4.x，固定 3.2.2
 
 # 测试
-pytest==7.4.4
-httpx==0.25.2
+pytest==9.1.1
+httpx==0.28.1
 
 # LLM 接入（后续阶段使用）
-openai==1.6.1
+openai==3.14.0
 
 # C 批简历正文提取
 pypdf==6.14.2
 python-docx==1.2.0
-PyMuPDF==1.26.7
+PyMuPDF==1.28.0
 rapidocr_onnxruntime==1.4.4
+# 保留现有 OCR 接口，固定一起实测的原生推理与图像依赖。
+onnxruntime==1.31.1
 numpy==1.26.4
-opencv-python==4.10.0.84
+opencv-python==4.11.0.86

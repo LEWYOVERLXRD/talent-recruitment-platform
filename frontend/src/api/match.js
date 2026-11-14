@@ -3,9 +3,9 @@ import request from './request'
 
 // 执行匹配 POST /api/v1/matches
 // 请求体五项必填：{ job_id, candidate_id, resume_id, expected_job_version, expected_skill_revision }
-// 每次新增一条，不覆盖历史；模型调用单独较长超时
+// 每次新增一条，不覆盖历史；为默认主备模型各 60 秒的请求留出余量
 export function runMatch(payload) {
-  return request.post('/api/v1/matches', payload, { timeout: 90000, businessStatus: true })
+  return request.post('/api/v1/matches', payload, { timeout: 150000, businessStatus: true })
 }
 
 // 匹配结果分页列表 GET /api/v1/matches

@@ -54,18 +54,17 @@ CREATE DATABASE recruitment_platform DEFAULT CHARACTER SET utf8mb4;
 
 ### 2. 后端
 
+先按 [Python 3.11 运行说明](backend/RUNTIME.md) 创建独立解释器、虚拟环境并安装哈希锁定的依赖，然后配置本地 `.env`。签名密钥缺失、使用旧默认值或示例占位符时，应用会拒绝启动。
+
 ```powershell
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env      # 然后按实际情况填写
+$python = Join-Path $env:USERPROFILE 'Desktop\workspace\.local\thesis-py311-venv\Scripts\python.exe'
 ```
 
-按编号顺序执行 `backend/migrations` 下的 SQL 脚本建表，然后启动：
+完成数据库基线核验及备份后，使用配置好的环境启动：
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+& $python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 接口文档：http://127.0.0.1:8000/docs （OpenAPI：`/api/v1/openapi.json`）
@@ -98,7 +97,7 @@ npm run dev
 
 ```powershell
 cd backend
-python -m pytest tests -q
+& $python -m pytest tests -q
 ```
 
 用例覆盖认证、角色越权、跨企业数据隔离、简历上传与解析、技能确认、匹配快照与投递下载闭环，当前全量通过。

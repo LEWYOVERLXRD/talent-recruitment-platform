@@ -69,12 +69,12 @@ export function getResumeSkills(id) {
 }
 
 // AI 技能抽取 POST /api/v1/resumes/{id}/extract-skills
-// 请求体 { expected_skill_revision }；模型调用单独较长超时
+// 请求体 { expected_skill_revision }；为默认主备模型各 60 秒的请求留出余量
 export function extractSkills(id, expectedSkillRevision) {
   return request.post(
     `/api/v1/resumes/${id}/extract-skills`,
     { expected_skill_revision: expectedSkillRevision },
-    { timeout: 90000, businessStatus: true },
+    { timeout: 150000, businessStatus: true },
   )
 }
 

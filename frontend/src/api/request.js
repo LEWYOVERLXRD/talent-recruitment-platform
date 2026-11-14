@@ -28,6 +28,9 @@ service.interceptors.response.use(
   async (error) => {
     const status = error.response?.status
     let detail = '请求失败，请稍后重试'
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      detail = '请求超时，请先刷新页面确认处理结果，再决定是否重试'
+    }
 
     // 下载等 blob 请求失败时，后端错误体是 Blob，需读取后再取 detail
     if (error.response?.data instanceof Blob) {

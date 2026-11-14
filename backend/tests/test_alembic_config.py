@@ -18,12 +18,17 @@ def test_alembic_config_and_script_directory():
 
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0001"], f"当前迁移 head 应为 0001，实际为: {heads}"
+    assert heads == ["0002"], f"当前迁移 head 应为 0002，实际为: {heads}"
 
-    rev = script.get_revision("0001")
-    assert rev is not None
-    assert rev.down_revision is None
-    assert "0001_baseline_20_tables" in rev.doc
+    rev_0001 = script.get_revision("0001")
+    assert rev_0001 is not None
+    assert rev_0001.down_revision is None
+    assert "0001_baseline_20_tables" in rev_0001.doc
+
+    rev_0002 = script.get_revision("0002")
+    assert rev_0002 is not None
+    assert rev_0002.down_revision == "0001"
+    assert "interview_question_sets" in rev_0002.doc
 
 
 def test_application_model_primary_slot():
@@ -123,13 +128,13 @@ def test_verify_db_ready_mysql_branches(monkeypatch):
     with pytest.raises(RuntimeError, match="alembic stamp 0001"):
         real_db.verify_db_ready(make_fake_engine(["alembic_version", "users", "jobs"], ()))
 
-    # 5. 未知版本（如 0002）-> 拒绝启动
+    # 5. 未知版本（如 9999_unknown）-> 拒绝启动
     with pytest.raises(RuntimeError, match="版本不匹配"):
-        real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("0002",)))
+        real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("9999_unknown",)))
 
-    # 6. 0001 旁边存在额外版本（多 head）-> 拒绝启动
+    # 6. head 旁边存在额外版本（多 head）-> 拒绝启动
     with pytest.raises(RuntimeError, match="版本不匹配"):
-        real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("0001", "extra_rev")))
+        real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("0002", "extra_rev")))
 
-    # 7. 正常单一 0001 -> 顺利通过
-    real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("0001",)))
+    # 7. 正常单一 head (0002) -> 顺利通过
+    real_db.verify_db_ready(make_fake_engine(["alembic_version", "users"], ("0002",)))

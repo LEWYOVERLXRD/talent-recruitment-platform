@@ -731,22 +731,48 @@ def run_validation(mode: str, output_path: Path) -> None:
         }
 
         # =====================================================================
-        # 8. 外键数量与孤儿数据精准核对（归档 61 项外键）
+        # 8. 外键数量与孤儿数据精准核对（0001 基线 61 项外键 + head 新增约束与全外键孤儿）
         # =====================================================================
-        print(">>> 精准核对外键数量与孤儿数据")
+        print(">>> 精准核对 0001 基线外键数量、head 新增约束与外键孤儿")
+        fk_sql = text("""
+            SELECT k.TABLE_NAME, k.COLUMN_NAME, k.CONSTRAINT_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME
+            FROM information_schema.KEY_COLUMN_USAGE k
+            JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+              ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME
+             AND r.TABLE_NAME=k.TABLE_NAME
+            WHERE k.TABLE_SCHEMA=:schema_name AND k.REFERENCED_TABLE_NAME IS NOT NULL
+            ORDER BY k.TABLE_NAME, k.COLUMN_NAME
+        """)
+        with engine_base.connect() as c:
+            base_fk_rows = c.execute(fk_sql, {"schema_name": db_names["baseline"]}).fetchall()
+            base_fk_count = len(base_fk_rows)
+            print(f"  0001 基线外键列关联总数: {base_fk_count} 项")
+            assert base_fk_count == 61, f"0001 基线外键总数期望 61，实际为 {base_fk_count}"
+
         with engine_green.connect() as c:
-            fk_rows = c.execute(text("""
-                SELECT k.TABLE_NAME, k.COLUMN_NAME, k.CONSTRAINT_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME
-                FROM information_schema.KEY_COLUMN_USAGE k
-                JOIN information_schema.REFERENTIAL_CONSTRAINTS r
-                  ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME
-                 AND r.TABLE_NAME=k.TABLE_NAME
-                WHERE k.TABLE_SCHEMA=:schema_name AND k.REFERENCED_TABLE_NAME IS NOT NULL
-                ORDER BY k.TABLE_NAME, k.COLUMN_NAME
-            """), {"schema_name": db_names["greenfield"]}).fetchall()
+            fk_rows = c.execute(fk_sql, {"schema_name": db_names["greenfield"]}).fetchall()
             fk_count = len(fk_rows)
-            print(f"  当前库外键列关联总数: {fk_count} 项")
-            assert fk_count == 61, f"外键总数期望 61，实际为 {fk_count}"
+            print(f"  当前 head 库外键列关联总数: {fk_count} 项")
+            assert fk_count >= 65, f"head 外键总数期望 >= 65，实际为 {fk_count}"
+
+            iqs_fks = {r[2] for r in fk_rows if r[0] == "interview_question_sets"}
+            expected_iqs_fks = {
+                "fk_iqs_recommendation_id",
+                "fk_iqs_job_id",
+                "fk_iqs_candidate_id",
+                "fk_iqs_created_by",
+            }
+            assert expected_iqs_fks <= iqs_fks, f"缺少 0002 外键约束: {expected_iqs_fks - iqs_fks}"
+
+            ck_rows = c.execute(text("""
+                SELECT CONSTRAINT_NAME
+                FROM information_schema.TABLE_CONSTRAINTS
+                WHERE TABLE_SCHEMA=:schema_name
+                  AND TABLE_NAME='interview_question_sets'
+                  AND CONSTRAINT_TYPE='CHECK'
+            """), {"schema_name": db_names["greenfield"]}).fetchall()
+            iqs_cks = {r[0] for r in ck_rows}
+            assert {"ck_iqs_rec_status", "ck_iqs_rec_version"} <= iqs_cks, f"缺少 0002 CHECK 约束: {iqs_cks}"
 
             for row in fk_rows:
                 tbl, col, c_name, ref_tbl, ref_col = row[0], row[1], row[2], row[3], row[4]
@@ -757,9 +783,11 @@ def run_validation(mode: str, output_path: Path) -> None:
                 """)).scalar_one()
                 assert cnt == 0, f"发现外键孤儿: {tbl}.{col}"
 
-        print("  通过: 61 项外键孤儿检查均为 0")
+        print(f"  通过: 0001 基线 61 项外键完整；head ({fk_count} 项外键与 0002 新增约束) 孤儿检查均为 0")
         report["foreign_keys_audit"] = {
+            "baseline_foreign_keys": base_fk_count,
             "total_foreign_keys": fk_count,
+            "head_0002_constraints_verified": True,
             "all_orphans_zero": True,
         }
 

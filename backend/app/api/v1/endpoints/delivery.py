@@ -11,7 +11,12 @@ from app.schemas.delivery import (
     RecommendationPage, RecommendationRefresh, RecommendationStage, RecommendationSubmit,
     RecommendationUpdate,
 )
-from app.services import delivery_service
+from app.schemas.interview_question import (
+    InterviewQuestionGenerateIn,
+    InterviewQuestionSetListOut,
+    InterviewQuestionSetOut,
+)
+from app.services import delivery_service, interview_question_service
 
 router = APIRouter(tags=["猎头沟通与推荐交付"])
 _WORK_ROLES = (UserRole.headhunter, UserRole.admin)
@@ -110,3 +115,31 @@ def feedbacks(recommendation_id: int, page: int = Query(1, ge=1), size: int = Qu
 def add_feedback(recommendation_id: int, payload: RecommendationFeedbackCreate, db: Session = Depends(get_db),
                  user: User = Depends(require_role(UserRole.recruiter))):
     return delivery_service.add_feedback(db, user, recommendation_id, payload)
+
+
+@router.get(
+    "/recommendations/{recommendation_id}/interview-questions",
+    response_model=InterviewQuestionSetListOut,
+    summary="企业查看推荐关联的历史面试题组",
+)
+def list_interview_questions(
+    recommendation_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.recruiter)),
+):
+    return interview_question_service.list_interview_questions(db, user, recommendation_id)
+
+
+@router.post(
+    "/recommendations/{recommendation_id}/interview-questions",
+    status_code=201,
+    response_model=InterviewQuestionSetOut,
+    summary="企业为已接收/面试中的推荐生成面试题组",
+)
+def generate_interview_questions(
+    recommendation_id: int,
+    payload: InterviewQuestionGenerateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.recruiter)),
+):
+    return interview_question_service.generate_interview_questions(db, user, recommendation_id, payload)

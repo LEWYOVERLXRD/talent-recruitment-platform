@@ -298,6 +298,86 @@
           </el-form>
           <el-button type="primary" :loading="feedbackSaving" @click="submitFeedback">提交反馈</el-button>
         </div>
+
+        <!-- 企业端面试题生成与回看 -->
+        <template v-if="userStore.role === 'recruiter'">
+          <el-divider content-position="left">AI 面试题</el-divider>
+
+          <div class="iq-toolbar mb">
+            <div>
+              <span class="sub">基于固定交付快照生成结构化面试题（已过滤常见手机/座机/邮箱并移除简历文件名）；历史题组永久保留供回看。</span>
+            </div>
+            <el-button
+              v-if="canGenerateQuestions"
+              type="primary"
+              plain
+              :loading="iqState.questionGenerating"
+              :disabled="iqState.questionGenerating || iqState.questionLoading"
+              @click="handleGenerateQuestions"
+            >
+              生成面试题
+            </el-button>
+            <el-tag v-else type="info" size="small">
+              仅「已接收」或「面试中」状态可生成新题组
+            </el-tag>
+          </div>
+
+          <el-alert
+            v-if="iqState.questionError"
+            :title="iqState.questionError"
+            type="error"
+            show-icon
+            closable
+            class="mb"
+            @close="iqState.questionError = ''"
+          />
+
+          <div v-loading="iqState.questionLoading || iqState.questionGenerating">
+            <el-empty
+              v-if="!iqState.questionLoading && !iqState.questionGenerating && iqState.questionSets.length === 0"
+              description="暂无面试题组，可在已接收或面试中状态点击「生成面试题」"
+              :image-size="64"
+            />
+
+            <el-card
+              v-for="qset in iqState.questionSets"
+              :key="qset.id"
+              shadow="never"
+              class="iq-set-card mb"
+            >
+              <template #header>
+                <div class="card-head">
+                  <div class="head-left">
+                    <strong>题组 #{{ qset.id }}</strong>
+                    <el-tag size="small" :type="statusTag(qset.recommendation_status)">
+                      {{ statusText(qset.recommendation_status) }} · v{{ qset.recommendation_version }}
+                    </el-tag>
+                    <el-tag size="small" type="info">模型: {{ qset.model_used }}</el-tag>
+                    <span class="sub">{{ fmt(qset.created_at) }}</span>
+                  </div>
+                  <el-button size="small" plain @click="copyQuestionSet(qset)">复制题组</el-button>
+                </div>
+              </template>
+
+              <p class="sub mb" v-if="qset.input_summary">
+                输入摘要：{{ qset.input_summary.job?.title || '岗位' }} /
+                {{ qset.input_summary.candidate_profile?.current_position || '候选人' }}
+                （已过滤常见联系方式：{{ qset.input_summary.contact_fields_removed ? '是' : '否' }}）
+              </p>
+
+              <div v-for="(item, idx) in qset.questions" :key="idx" class="iq-item">
+                <div class="iq-q"><strong>Q{{ idx + 1 }}. {{ item.question }}</strong></div>
+                <div class="iq-meta"><strong>考察目的：</strong>{{ item.purpose }}</div>
+                <div class="iq-meta">
+                  <strong>参考要点：</strong>
+                  <ul class="iq-points">
+                    <li v-for="(pt, pIdx) in item.key_points" :key="pIdx">{{ pt }}</li>
+                  </ul>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </template>
       </template>
     </template>
   </el-card>
@@ -318,10 +398,16 @@ import {
   listFeedbacks,
   addFeedback,
   downloadRecommendationResume,
+  listInterviewQuestions,
+  generateInterviewQuestions,
 } from '@/api/recommendation'
 import { allResumeVersions } from '@/api/resume'
 import { listCommunications } from '@/api/communication'
 import { listAssignments } from '@/api/assignment'
+import {
+  createInterviewQuestionState,
+  createInterviewQuestionController,
+} from './interviewQuestionState'
 
 const route = useRoute()
 const router = useRouter()
@@ -357,6 +443,9 @@ const feedbackTotal = ref(0)
 const feedbackSaving = ref(false)
 const feedbackForm = reactive({ feedback_type: 'recommendation', conclusion: '', content: '' })
 
+const iqState = reactive(createInterviewQuestionState())
+const iqController = createInterviewQuestionController(iqState)
+
 const snapshot = computed(() => detail.value?.delivery_snapshot || null)
 // 猎头且草稿才可操作准备/提交（管理员只读）
 const canOperate = computed(() => userStore.isHeadhunter && detail.value?.can_edit === true)
@@ -367,6 +456,11 @@ const canRefresh = computed(() => canOperate.value && currentAssignment.value &&
 const mutationBusy = computed(() => saving.value || staging.value || refreshing.value || submitting.value || loading.value)
 // 客户对本企业已交付推荐可反馈
 const canFeedback = computed(() => userStore.role === 'recruiter' && detail.value?.can_feedback === true)
+const canGenerateQuestions = computed(() => (
+  userStore.role === 'recruiter'
+  && Boolean(detail.value?.delivery_snapshot)
+  && ['accepted', 'interviewing'].includes(detail.value?.status)
+))
 
 const conclusionOptions = computed(() => {
   const options = [{ value: 'note', label: '备注' }]
@@ -476,6 +570,7 @@ async function load() {
   Object.assign(feedbackForm, { feedback_type: 'recommendation', conclusion: '', content: '' })
   feedbacks.value = []
   feedbackTotal.value = 0
+  iqController.resetForRecommendation(route.params.id)
   try {
     const data = await getRecommendation(route.params.id)
     if (!active || seq !== loadSeq) return
@@ -492,6 +587,10 @@ async function load() {
     }
     if (data?.delivery_snapshot) {
       await loadFeedbackPage()
+      if (!active || seq !== loadSeq) return
+      if (userStore.role === 'recruiter') {
+        await loadInterviewQuestions(data.id)
+      }
     }
   } catch (e) {
     if (!active || seq !== loadSeq) return
@@ -720,11 +819,43 @@ function goBack() {
   router.push({ name: 'Recommendations' })
 }
 
+async function loadInterviewQuestions(recId) {
+  if (!recId || userStore.role !== 'recruiter') return
+  await iqController.loadList(recId, listInterviewQuestions)
+}
+
+async function handleGenerateQuestions() {
+  if (!canGenerateQuestions.value || !detail.value?.id) return
+  await iqController.generate(
+    detail.value.id,
+    detail.value.version,
+    generateInterviewQuestions,
+    {
+      onSuccess: (msg) => ElMessage.success(msg),
+      onError: (msg) => ElMessage.error(msg),
+    },
+  )
+}
+
+async function copyQuestionSet(qset) {
+  const lines = (qset.questions || []).map((item, idx) => {
+    const pts = (item.key_points || []).map((pt) => `   - ${pt}`).join('\n')
+    return `${idx + 1}. ${item.question}\n考察目的：${item.purpose}\n参考要点：\n${pts}`
+  })
+  const text = `【面试题组 #${qset.id} | 模型：${qset.model_used}】\n\n${lines.join('\n\n')}`
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制题组到剪贴板')
+  } catch {
+    ElMessage.warning('当前环境不支持自动剪贴板写入，请手动复制')
+  }
+}
+
 watch(() => route.params.id, () => {
   feedbackPage.value = 1
   load()
 }, { immediate: true })
-onBeforeUnmount(() => { active = false; ++loadSeq; ++feedbackSeq })
+onBeforeUnmount(() => { active = false; ++loadSeq; ++feedbackSeq; iqController.dispose() })
 </script>
 
 <style scoped>
@@ -792,6 +923,37 @@ onBeforeUnmount(() => { active = false; ++loadSeq; ++feedbackSeq })
 .pager {
   margin-top: 12px;
   justify-content: flex-end;
+}
+.iq-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.iq-set-card {
+  background: #fcfcfd;
+}
+.iq-item {
+  padding: 10px 0;
+  border-top: 1px solid #f0f2f5;
+}
+.iq-item:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.iq-q {
+  margin-bottom: 4px;
+  color: #303133;
+}
+.iq-meta {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.iq-points {
+  margin: 4px 0 0 18px;
+  padding: 0;
 }
 @media (max-width: 640px) {
   .card-head {

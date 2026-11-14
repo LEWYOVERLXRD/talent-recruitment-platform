@@ -19,6 +19,7 @@ from app.models.recommendation import Recommendation, RecommendationStatus
 from app.models.recommendation_feedback import RecommendationFeedback
 from app.models.communication import Communication, CommType, CommResult
 from app.models.match_analysis import MatchAnalysis
+from app.models.interview_question import InterviewQuestionSet
 from app.models.agency import Agency
 from app.models.agency_member import AgencyMember
 from app.models.service_provider import ServiceProvider
@@ -42,6 +43,7 @@ __all__ = [
     "Recommendation", "RecommendationStatus", "RecommendationFeedback",
     "Communication", "CommType", "CommResult",
     "MatchAnalysis",
+    "InterviewQuestionSet",
     "Agency", "AgencyMember", "ServiceProvider", "CompanyInvitation",
     "Application", "ApplicationStatus", "ApplicationSource", "ApplicationReviewStatus", "ApplicationRecordKind",
 ]

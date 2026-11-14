@@ -73,3 +73,17 @@ export async function downloadRecommendationResume(id, filename) {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+// 历史面试题组 GET /api/v1/recommendations/{id}/interview-questions
+export function listInterviewQuestions(id) {
+  return request.get(`/api/v1/recommendations/${id}/interview-questions`, { businessStatus: true })
+}
+
+// 生成企业面试题组 POST /api/v1/recommendations/{id}/interview-questions
+// 为默认主备模型各 60 秒的请求留出余量
+export function generateInterviewQuestions(id, payload = {}) {
+  return request.post(`/api/v1/recommendations/${id}/interview-questions`, payload, {
+    timeout: 150000,
+    businessStatus: true,
+  })
+}

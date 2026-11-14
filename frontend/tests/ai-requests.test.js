@@ -28,7 +28,7 @@ async function loadApi() {
   await request.link((name) => dependencies[name])
   await request.evaluate()
   const modules = {}
-  for (const name of ['match', 'resume']) {
+  for (const name of ['match', 'resume', 'recommendation']) {
     const module = new SourceTextModule(
       await readFile(new URL(`../src/api/${name}.js`, import.meta.url), 'utf8'),
       { context },
@@ -49,10 +49,16 @@ test('AI 请求为主备模型留出等待时间，普通列表保持原超时',
   }
   await api.match.runMatch({ job_id: 10 })
   await api.resume.extractSkills(20, 0)
+  await api.recommendation.generateInterviewQuestions(30, { expected_version: 2 })
   await api.match.listMatches({ page: 1 })
-  assert.deepEqual(calls.map((call) => call.timeout), [150000, 150000, 10000])
+  await api.recommendation.listInterviewQuestions(30)
+  assert.deepEqual(calls.map((call) => call.timeout), [150000, 150000, 150000, 10000, 10000])
   assert.deepEqual(calls.map((call) => call.url), [
-    '/api/v1/matches', '/api/v1/resumes/20/extract-skills', '/api/v1/matches',
+    '/api/v1/matches',
+    '/api/v1/resumes/20/extract-skills',
+    '/api/v1/recommendations/30/interview-questions',
+    '/api/v1/matches',
+    '/api/v1/recommendations/30/interview-questions',
   ])
 })
 
